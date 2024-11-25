@@ -2,6 +2,8 @@
 
 `catfetch` is a minimal system information tool written in pure shell script. It provides basic system details without any arguments or options. There are no ASCII graphics.
 
+![screenshot](https://github.com/user-attachments/assets/2b92c4ed-e15a-4c56-856d-0b88832076e6)
+
 ## Installation
 
 1. Make the script executable:
