@@ -1,0 +1,85 @@
+#!/bin/sh
+
+# Fetch device name (model) from multiple sources
+get_device_name() {
+    if [ -f /sys/firmware/devicetree/base/model ]; then
+        cat /sys/firmware/devicetree/base/model | tr -d '\0'
+        return
+    fi
+    if [ -f /proc/device-tree/model ]; then
+        cat /proc/device-tree/model | tr -d '\0'
+        return
+    fi
+    if grep -q "Model" /proc/cpuinfo 2>/dev/null; then
+        grep "Model" /proc/cpuinfo | awk -F': ' '{print $2}' | xargs
+        return
+    fi
+    if [ -f /sys/devices/virtual/dmi/id/product_name ]; then
+        PRODUCT_NAME=$(cat /sys/devices/virtual/dmi/id/product_name)
+        PRODUCT_VERSION=$(cat /sys/devices/virtual/dmi/id/product_version 2>/dev/null)
+        echo "${PRODUCT_NAME} ${PRODUCT_VERSION}"
+        return
+    fi
+    echo "Unknown Device"
+}
+
+# Fetch CPU information
+get_cpu_info() {
+    # Count processors
+    CPU_COUNT=$(grep -c "^processor" /proc/cpuinfo)
+
+    # Detect CPU frequencies
+    CPU_FREQUENCIES=""
+    if [ -d /sys/devices/system/cpu ]; then
+        # Use cpufreq files if available
+        for CPU in /sys/devices/system/cpu/cpu[0-9]*/cpufreq/scaling_cur_freq; do
+            if [ -f "$CPU" ]; then
+                FREQ=$(cat "$CPU" | awk '{printf "%.1f GHz", $1/1000000}')
+                CPU_FREQUENCIES="${CPU_FREQUENCIES}${FREQ}\n"
+            fi
+        done
+    elif grep -q "cpu MHz" /proc/cpuinfo; then
+        # Fallback to /proc/cpuinfo for x86
+        CPU_FREQUENCIES=$(awk -F': ' '/cpu MHz/ {printf("%.1f GHz\n", $2/1000)}' /proc/cpuinfo)
+    fi
+
+    # Group by frequency and count
+    if [ -n "$CPU_FREQUENCIES" ]; then
+        echo "$CPU_FREQUENCIES" | grep -v "^\s*$" | sort | uniq -c | awk '{printf("%s @ %s GHz, ", $1, $2)}' | sed 's/, $//'
+    else
+        echo "${CPU_COUNT} @ Unknown Frequency"
+    fi
+}
+
+DEVICE=$(get_device_name)
+OS="$(grep '^PRETTY_NAME=' /etc/os-release | cut -d= -f2 | tr -d '"') $(uname -m)"
+KERNEL=$(uname -r)
+SHELL="$(${SHELL} --version 2>/dev/null | head -n 1 | awk '{print $1, $2}')"
+MEM_TOTAL=$(awk '/MemTotal/ {printf "%.0f MiB", $2/1024}' /proc/meminfo)
+MEM_AVAILABLE=$(awk '/MemAvailable/ {printf "%.0f MiB", $2/1024}' /proc/meminfo)
+MEMORY="${MEM_AVAILABLE} / ${MEM_TOTAL}"
+CPU=$(get_cpu_info)
+
+# Color
+C1="\033[1;31m"
+C2="\033[1;37m"
+C="\033[0m"
+
+USER_HOST="${USER}@$(hostname)"
+SEPARATOR_LENGTH=${#USER_HOST}
+SEPARATOR=$(printf '%*s' "${SEPARATOR_LENGTH}" | tr ' ' '-')
+
+# Print
+echo "${C1}${USER_HOST}${C}"
+echo "${SEPARATOR}"
+echo "${C2}OS${C}\t: ${OS}"
+echo "${C2}Device${C}\t: ${DEVICE}"
+echo "${C2}Kernel${C}\t: ${KERNEL}"
+echo "${C2}Shell${C}\t: ${SHELL}"
+echo "${C2}CPU${C}\t: ${CPU}"
+echo "${C2}Memory${C}\t: ${MEMORY}"
+
+# 16 colors
+echo
+echo "\033[30m███\033[31m███\033[32m███\033[33m███\033[34m███\033[35m███\033[36m███\033[37m███\033[0m"
+echo "\033[90m███\033[91m███\033[92m███\033[93m███\033[94m███\033[95m███\033[96m███\033[97m███\033[0m"
