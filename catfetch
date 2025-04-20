@@ -57,6 +57,11 @@ LIGHT_MAGENTA="\033[95m"
 LIGHT_CYAN="\033[96m"
 LIGHT_WHITE="\033[97m"
 
+# filter out libselinux warning on AppImage
+sed() {
+  command sed "$@" 2>&1 | grep -v 'libselinux.so.1'
+}
+
 BOLD="\033[1m"
 RESET="\033[0m"
 
