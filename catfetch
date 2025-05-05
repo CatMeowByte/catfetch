@@ -66,10 +66,10 @@ BOLD="\033[1m"
 RESET="\033[0m"
 
 COLOR_ACCENT=$(eval echo "\$$COLOR_ACCENT_NAME")
+COLOR_ACCENT_BG="\033[$(( $(echo "$COLOR_ACCENT" | grep -o '[0-9]\+') + 10))m"
 
 USER_HOST="${USER}@$(hostname)"
-SEPARATOR_LENGTH=${#USER_HOST}
-SEPARATOR=$(printf '%*s' "$SEPARATOR_LENGTH" | tr ' ' '-')
+# SEPARATOR=$(printf '%*s' "${#USER_HOST}" | tr ' ' '-')
 
 COLOR_BAR_1=$(for c in $(seq 30 37); do printf "\033[${c}m%0.s█" $(seq $COLOR_BAR_WIDTH); done; printf "\033[0m\n")
 COLOR_BAR_2=$(for c in $(seq 90 97); do printf "\033[${c}m%0.s█" $(seq $COLOR_BAR_WIDTH); done; printf "\033[0m\n")
@@ -82,24 +82,23 @@ INFO_CPU=$(grep -m1 'model name' /proc/cpuinfo | cut -d ':' -f2- | sed 's/^ //')
 INFO_GPU=$(lspci | awk '/VGA compatible controller|3D controller|Display controller/' \
   | cut -d ':' -f3- \
   | sed 's/^ //' \
-  | sed -e 's/ Corporation//' \
-        -e 's/ Inc\.//' \
-        -e 's/ Integrated Graphics Controller//' \
-        -e 's/ (rev .*//g' \
-        -e 's/  */ /g' \
-        -e 's/^ *//' -e 's/ *$//')
+  | sed -E \
+    -e 's/ Corporation//g' \
+    -e 's/ Inc\.//g' \
+    -e 's/ Integrated Graphics Controller//g' \
+    -e 's/ \(rev .*//g' \
+    -e 's/  */ /g' \
+    -e 's/^ *//' -e 's/ *$//' \
+    -e 's/\[(([^] ]+ ){0,3}[^] ]+)[^]]*\]/[\1]/' \
+  )
 
 INFO_LINES=$(cat << EOF
-${COLOR_ACCENT}${USER_HOST}${RESET}
-${SEPARATOR}
+${BOLD}${COLOR_ACCENT_BG}${BLACK} ${USER} @ $(hostname) ${RESET}
 ${BOLD}${WHITE}System${RESET} : ${INFO_SYSTEM}
 ${BOLD}${WHITE}Kernel${RESET} : ${INFO_KERNEL} LibC ${INFO_LIBC}
 ${BOLD}${WHITE}Shell${RESET}  : ${INFO_SHELL}
 ${BOLD}${WHITE}CPU${RESET}    : ${INFO_CPU}
 ${BOLD}${WHITE}GPU${RESET}    : ${INFO_GPU}
-
-$COLOR_BAR_1
-$COLOR_BAR_2
 EOF
 )
 
@@ -134,6 +133,13 @@ while [ "$i" -lt "$ICON_HEIGHT" ] || [ "$i" -lt "$INFO_HEIGHT" ]; do
   fi
 
   info=$(printf "%s\n" "$INFO_LINES" | sed -n "$((i + 1))p")
+
+  if [ "$i" -eq $((ICON_HEIGHT - 2)) ]; then
+    info=$COLOR_BAR_1
+  elif [ "$i" -eq $((ICON_HEIGHT - 1)) ]; then
+    info=$COLOR_BAR_2
+  fi
+
   spacer=$(printf "%*s" "$SPACER_WIDTH" "")
   printf "%s%s%b\n" "$icon" "$spacer" "$info"
 
